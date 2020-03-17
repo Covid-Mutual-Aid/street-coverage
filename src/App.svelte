@@ -127,6 +127,41 @@
 		window.dispatchEvent(new Event('resize'))
 	}
 	
+	const requestOs = async (latLng, locality, town, postcode) => {
+		
+		let snippet = ''
+		if(locality) {
+			snippet += `, ${locality}`
+		}
+		if(town) {
+			snippet += `,${town}`
+		}
+		if(postcode) {
+			snippet += `, ${postcode}`
+		}
+        const q = `${streetName}, ${latLng}${snippet}`
+        const opUrl = `https://nominatim.openstreetmap.org/search?q=${q}&polygon_geojson=1&format=json`
+        const opRes = await fetch(opUrl)
+        const results = await opRes.json()
+        
+        return results  
+		
+	}
+	
+	const updateCoords = (results, locality, town, postcode) => {
+		results.forEach((result, i) => {
+			if(result.geojson.type == 'LineString') {
+				if(
+					postcode && result.display_name.includes(postcode) ||
+					locality && result.display_name.includes(locality) ||
+					town && result.display_name.includes(town)
+				) {
+					cooordsSets.push(result.geojson.coordinates)	
+				}
+			}
+		})
+	}
+	
 	onMount(() => {
 		
 		main.style.setProperty(
@@ -150,31 +185,37 @@
 		      streetName = ''
 		      cooordsSets = []
 		      let place = autocomplete.getPlace()
+		      let latLng = `[${place.geometry.location.lat()}, ${place.geometry.location.lng()}]`
 		      let components = place.address_components
 		      let opPostcode = components.find(comp => comp.types.includes('postal_code'))
 		      let opStreet = components.find(comp => comp.types.includes('route'))
-		      let opLocality = components.find(comp => comp.types.includes('locality')) || components.find(comp => comp.types.includes('postal_town'))
-		      if(opStreet && (opPostcode || opLocality)) {
+		      let opLocality = components.find(comp => comp.types.includes('locality'))
+		      let opTown = components.find(comp => comp.types.includes('postal_town'))
+		      if(opStreet && (opPostcode || opLocality || opTown)) {
 		        streetName = opStreet.long_name
-		        postcode = opPostcode ? opPostcode.short_name : opLocality.long_name
-		        const city = opLocality.long_name
-		        const q = `${streetName}, [${place.geometry.location.lat()}, ${place.geometry.location.lng()}], ${city}, ${postcode}`
-		        const opUrl = `https://nominatim.openstreetmap.org/search?q=${q}&polygon_geojson=1&format=json`
-		        const opRes = await fetch(opUrl)
-		        const results = await opRes.json()
+		        postcode = opPostcode ? opPostcode.short_name : null
+		        const locality = opLocality ? opLocality.long_name : null
+		        const town = opTown ? opTown.long_name : null
+		        let results = await requestOs(latLng, locality, town, postcode)
 		        if(results.length) {
-		          results.forEach((result, i) => {
-		            if(result.geojson.type == 'LineString' && result.display_name.includes(city)) {
-		              cooordsSets.push(result.geojson.coordinates)
-		            }
-		          })
-		        } else {
-		          vanillaToast.error('This is not a street')
-		          streetInput.value = ''
+			      updateCoords(results, locality, town, postcode)
+		        } else {	
+			        results = await requestOs(latLng, locality, town)	
+			        if(results.length) {
+				      updateCoords(results, locality, town, postcode)
+			        } else {
+				        results = await requestOs(latLng, locality)
+				        if(results.length) {
+					      updateCoords(results, locality, town, postcode)
+				        } else {
+							vanillaToast.error('This street is not within a 2 mile radius of you')
+							streetInput.value = ''
+						}
+					}
 		        }
 		      } else {
-		        vanillaToast.error('This is not a street')
-		        streetInput.value = ''
+				vanillaToast.error('This is not a street')
+				streetInput.value = ''
 		      }
 		    })
 		    try {
