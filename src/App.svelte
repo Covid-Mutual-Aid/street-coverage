@@ -5,10 +5,10 @@
 			<nav>
 				<ul>
 			        <li>
-			          <a href="#areas" class:active={$store.activeTab == 'areas'} on:click="{() => { $store.activeTab = 'areas'; refreshMap() }}">Streets Covered (Map)</a>
+			          <a href="#areas" class:active={$store.activeTab == 'areas'} on:click="{() => { $store.activeTab = 'areas'; refreshMap() }}">Streets Leafleted (Map)</a>
 			        </li>
 			        <li>
-			        	<a href="#list" class:active={$store.activeTab == 'list'} on:click="{() => $store.activeTab = 'list'}">Streets Covered (List)</a>
+			        	<a href="#list" class:active={$store.activeTab == 'list'} on:click="{() => $store.activeTab = 'list'}">Streets Leafleted (List)</a>
 			        </li>
 			        <li>
 			        	<a href="#cover" class:active={$store.activeTab == 'cover'} on:click="{() => $store.activeTab = 'cover'}">Leaflet Your Street</a>
@@ -34,19 +34,19 @@
 			</form>
 	    </div>
 	    <div class="section" class:active={$store.activeTab == 'areas'}>
-	    	<h1>Street Coverage</h1>
-			<p>Find out if your road is currently covered in the map below.</p>
-			<div bind:this={mapContainer} class="map" class:unconfirmed={unconfirmed}>
+	    	<h1>Streets Leafleted</h1>
+			<p>Find out if your street has been leafleted in the map below.</p>
+			<div bind:this={mapContainer} class="map" class:unconfirmed={unconfirmed} on:click={triggerNavigator}>
 				{#if loading}
 					<span>Loading Map</span>
 				{:else}
-					<span>Please let us know your location by clicking "Allow" on the prompt above to see the map</span>
+					<span>Please let us know your location by clicking "Allow" on the prompt above to see the map. If you cannot see the prompt click on this box.</span>
 				{/if}
 			</div>
 	    </div>
 	    <div class="section" class:active={$store.activeTab == 'list'}>
-	    	<h1>Streets Covered</h1>
-			<p>Find out if your road is currently covered in list below.</p>
+	    	<h1>Streets Leafleted</h1>
+			<p>Find out if your street has been leafleted in the list below.</p>
 			<ul>
 				{#each areas as area}
 					<li>{area.postcode} - {area.street} - {area.name}</li>
@@ -162,6 +162,83 @@
 		})
 	}
 	
+	const triggerNavigator = () => {
+		if(unconfirmed) {
+			navigator.geolocation.getCurrentPosition(async ({coords}) => {
+				loading = true
+			    center = [coords.latitude, coords.longitude]
+			    const circle = new google.maps.Circle({ center: new google.maps.LatLng(coords.latitude, coords.longitude), radius: 5 })
+			    const autocomplete = new google.maps.places.Autocomplete(streetInput, {
+			      bounds: circle.getBounds(),
+			      strictbounds: true,
+			      types: [
+			        'address'
+			      ]
+			    })
+			    autocomplete.addListener('place_changed', async () => {
+			      postcode = ''
+			      streetName = ''
+			      cooordsSets = []
+			      let place = autocomplete.getPlace()
+			      let latLng = `[${place.geometry.location.lat()}, ${place.geometry.location.lng()}]`
+			      let components = place.address_components
+			      let opPostcode = components.find(comp => comp.types.includes('postal_code'))
+			      let opStreet = components.find(comp => comp.types.includes('route'))
+			      let opLocality = components.find(comp => comp.types.includes('locality'))
+			      let opTown = components.find(comp => comp.types.includes('postal_town'))
+			      if(opStreet && (opPostcode || opLocality || opTown)) {
+			        streetName = opStreet.long_name
+			        postcode = opPostcode ? opPostcode.short_name : null
+			        const locality = opLocality ? opLocality.long_name : null
+			        const town = opTown ? opTown.long_name : null
+			        let results = await requestOs(latLng, locality, town, postcode)
+			        if(results.length) {
+				      updateCoords(results, locality, town, postcode)
+			        } else {	
+				        results = await requestOs(latLng, locality, town)	
+				        if(results.length) {
+					      updateCoords(results, locality, town, postcode)
+				        } else {
+					        results = await requestOs(latLng, locality)
+					        if(results.length) {
+						      updateCoords(results, locality, town, postcode)
+					        } else {
+								vanillaToast.error('This street is not within a 2 mile radius of you')
+								streetInput.value = ''
+							}
+						}
+			        }
+			      } else {
+					vanillaToast.error('This is not a street')
+					streetInput.value = ''
+			      }
+			    })
+			    try {
+				    map = L.map(mapContainer)
+				    map.setView(center, 15)
+					L.tileLayer('https://api.mapbox.com/styles/v1/{id}/tiles/{z}/{x}/{y}?access_token={accessToken}', {
+						attribution: 'Map data &copy; <a href="https://www.openstreetmap.org/">OpenStreetMap</a> contributors, <a href="https://creativecommons.org/licenses/by-sa/2.0/">CC-BY-SA</a>, Imagery © <a href="https://www.mapbox.com/">Mapbox</a>',
+						maxZoom: 18,
+						id: 'mapbox/streets-v11',
+						tileSize: 512,
+						zoomOffset: -1,
+						accessToken: mapboxToken
+					}).addTo(map)
+				    let areasRes = await fetch(`${apiUrl}?type=list`)
+					areas = await areasRes.json()
+					L.geoJSON(areas.map(area => new Object({
+						"type": "LineString",
+						"coordinates": JSON.parse(area.coordinates)
+					})), {color: '#b169e5'}).addTo(map)
+					refreshMap()
+					unconfirmed = false
+			    } catch(err) {
+			      vanillaToast.error(`no results found`)
+			    }
+			})	
+		}
+	}
+	
 	onMount(() => {
 		
 		main.style.setProperty(
@@ -169,79 +246,7 @@
 	      `${window.innerHeight}px`
 	    )
 	
-		navigator.geolocation.getCurrentPosition(async ({coords}) => {
-			loading = true
-		    center = [coords.latitude, coords.longitude]
-		    const circle = new google.maps.Circle({ center: new google.maps.LatLng(coords.latitude, coords.longitude), radius: 5 })
-		    const autocomplete = new google.maps.places.Autocomplete(streetInput, {
-		      bounds: circle.getBounds(),
-		      strictbounds: true,
-		      types: [
-		        'address'
-		      ]
-		    })
-		    autocomplete.addListener('place_changed', async () => {
-		      postcode = ''
-		      streetName = ''
-		      cooordsSets = []
-		      let place = autocomplete.getPlace()
-		      let latLng = `[${place.geometry.location.lat()}, ${place.geometry.location.lng()}]`
-		      let components = place.address_components
-		      let opPostcode = components.find(comp => comp.types.includes('postal_code'))
-		      let opStreet = components.find(comp => comp.types.includes('route'))
-		      let opLocality = components.find(comp => comp.types.includes('locality'))
-		      let opTown = components.find(comp => comp.types.includes('postal_town'))
-		      if(opStreet && (opPostcode || opLocality || opTown)) {
-		        streetName = opStreet.long_name
-		        postcode = opPostcode ? opPostcode.short_name : null
-		        const locality = opLocality ? opLocality.long_name : null
-		        const town = opTown ? opTown.long_name : null
-		        let results = await requestOs(latLng, locality, town, postcode)
-		        if(results.length) {
-			      updateCoords(results, locality, town, postcode)
-		        } else {	
-			        results = await requestOs(latLng, locality, town)	
-			        if(results.length) {
-				      updateCoords(results, locality, town, postcode)
-			        } else {
-				        results = await requestOs(latLng, locality)
-				        if(results.length) {
-					      updateCoords(results, locality, town, postcode)
-				        } else {
-							vanillaToast.error('This street is not within a 2 mile radius of you')
-							streetInput.value = ''
-						}
-					}
-		        }
-		      } else {
-				vanillaToast.error('This is not a street')
-				streetInput.value = ''
-		      }
-		    })
-		    try {
-			    map = L.map(mapContainer)
-			    map.setView(center, 15)
-				L.tileLayer('https://api.mapbox.com/styles/v1/{id}/tiles/{z}/{x}/{y}?access_token={accessToken}', {
-					attribution: 'Map data &copy; <a href="https://www.openstreetmap.org/">OpenStreetMap</a> contributors, <a href="https://creativecommons.org/licenses/by-sa/2.0/">CC-BY-SA</a>, Imagery © <a href="https://www.mapbox.com/">Mapbox</a>',
-					maxZoom: 18,
-					id: 'mapbox/streets-v11',
-					tileSize: 512,
-					zoomOffset: -1,
-					accessToken: mapboxToken
-				}).addTo(map)
-			    let areasRes = await fetch(`${apiUrl}?type=list`)
-				areas = await areasRes.json()
-				L.geoJSON(areas.map(area => new Object({
-					"type": "LineString",
-					"coordinates": JSON.parse(area.coordinates)
-				})), {color: 'red'}).addTo(map)
-				refreshMap()
-				unconfirmed = false
-		    } catch(err) {
-		      console.log(err)
-		      vanillaToast.error(`no results found`)
-		    }
-		})		
+		triggerNavigator()
 		
 	})
 	
