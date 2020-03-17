@@ -67,7 +67,7 @@
 	let postcode
 	let streetName
 	
-	const apiUrl = 'http://covid-mutual.kode.site/api/areas'
+	const apiUrl = '/api/areas'
 	const mapboxToken = 'pk.eyJ1IjoidGVyZW5jZTE5OTAiLCJhIjoiY2s3dXY3dHBiMWFmZTNlb3VkOTl5ZWJpbSJ9.jcuzjALaagKde10tEYKogA'
 	
 	const sendArea = (e) => {
