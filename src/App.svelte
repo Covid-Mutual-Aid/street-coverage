@@ -153,7 +153,7 @@
 		      let components = place.address_components
 		      let opPostcode = components.find(comp => comp.types.includes('postal_code'))
 		      let opStreet = components.find(comp => comp.types.includes('route'))
-		      let opLocality = components.find(comp => comp.types.includes('locality'))
+		      let opLocality = components.find(comp => comp.types.includes('locality')) || components.find(comp => comp.types.includes('postal_town'))
 		      if(opStreet && (opPostcode || opLocality)) {
 		        streetName = opStreet.long_name
 		        postcode = opPostcode ? opPostcode.short_name : opLocality.long_name
