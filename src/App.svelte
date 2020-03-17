@@ -5,21 +5,21 @@
 			<nav>
 				<ul>
 			        <li>
-			          <a href="#areas" class:active={$store.activeTab == 'areas'} on:click="{() => { $store.activeTab = 'areas'; refreshMap() }}">Areas Covered (Map)</a>
+			          <a href="#areas" class:active={$store.activeTab == 'areas'} on:click="{() => { $store.activeTab = 'areas'; refreshMap() }}">Streets Covered (Map)</a>
 			        </li>
 			        <li>
-			        	<a href="#list" class:active={$store.activeTab == 'list'} on:click="{() => $store.activeTab = 'list'}">Areas Covered (List)</a>
+			        	<a href="#list" class:active={$store.activeTab == 'list'} on:click="{() => $store.activeTab = 'list'}">Streets Covered (List)</a>
 			        </li>
 			        <li>
-			        	<a href="#cover" class:active={$store.activeTab == 'cover'} on:click="{() => $store.activeTab = 'cover'}">Help your Street</a>
+			        	<a href="#cover" class:active={$store.activeTab == 'cover'} on:click="{() => $store.activeTab = 'cover'}">Leaflet Your Street</a>
 			        </li>
 		      	</ul>
 			</nav>
 		</header>
 		
 		<div class="section" class:active={$store.activeTab == 'cover'}>
-			<h1>Let us know the roads you can help</h1>
-			<p>When you have leafleted a street, please complete this form and the spreadsheet will be updated.</p>
+			<h1>Let us know the streets you have leafleted</h1>
+			<p>When you have leafleted a street, please complete this form and the map and list will be updated.</p>
 			<p>You will essentially be responsible for the street you have leafleted, if you get overwhelmed with requests for help, let us know.</p>
 			<form on:submit={sendArea}>
 				<div class="field">
@@ -34,12 +34,18 @@
 			</form>
 	    </div>
 	    <div class="section" class:active={$store.activeTab == 'areas'}>
-	    	<h1>Areas Covered</h1>
+	    	<h1>Street Coverage</h1>
 			<p>Find out if your road is currently covered in the map below.</p>
-			<div bind:this={mapContainer} class="map"></div>
+			<div bind:this={mapContainer} class="map" class:unconfirmed={unconfirmed}>
+				{#if loading}
+					<span>Loading Map</span>
+				{:else}
+					<span>Please let us know your location by clicking "Allow" on the prompt above to see the map</span>
+				{/if}
+			</div>
 	    </div>
 	    <div class="section" class:active={$store.activeTab == 'list'}>
-	    	<h1>Areas Covered</h1>
+	    	<h1>Streets Covered</h1>
 			<p>Find out if your road is currently covered in list below.</p>
 			<ul>
 				{#each areas as area}
@@ -59,6 +65,9 @@
 	let streetInput
 	let name
 	let main
+	
+	let unconfirmed = true
+	let loading = false
 	
 	$: areas = []
 	
@@ -126,6 +135,7 @@
 	    )
 	
 		navigator.geolocation.getCurrentPosition(async ({coords}) => {
+			loading = true
 		    center = [coords.latitude, coords.longitude]
 		    const circle = new google.maps.Circle({ center: new google.maps.LatLng(coords.latitude, coords.longitude), radius: 5 })
 		    const autocomplete = new google.maps.places.Autocomplete(streetInput, {
@@ -185,6 +195,7 @@
 					"coordinates": JSON.parse(area.coordinates)
 				})), {color: 'red'}).addTo(map)
 				refreshMap()
+				unconfirmed = false
 		    } catch(err) {
 		      console.log(err)
 		      vanillaToast.error(`no results found`)
@@ -261,6 +272,14 @@
 	}
 	.map {
 		height: 500px;
+	}
+	.map.unconfirmed {
+		background-color: #f2f2f2;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		color: black;
+		padding: 2rem;
 	}
 	.banner {
 		margin-bottom: 4rem;
