@@ -103,7 +103,7 @@
 						"type": "LineString",
 						coordinates
 					}
-				], {color: 'red'}).addTo(map)
+				], {color: '#b169e5'}).addTo(map)
 				if((i+1) == cooordsSets.length) {
 					areas = areas.concat([data])
 					vanillaToast.success(`Thanks for helping out in ${streetName}, ${postcode}`)
