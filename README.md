@@ -1,8 +1,6 @@
-*Looking for a shareable component template? Go here --> [sveltejs/component-template](https://github.com/sveltejs/component-template)*
+# COVID Mutual Aid | Street Leaflet Coverage
 
----
-
-# svelte app
+Current demo is at [http://covid-mutual.kode.site/](http://covid-mutual.kode.site/)
 
 This is a project template for [Svelte](https://svelte.dev) apps. It lives at https://github.com/sveltejs/template.
 
