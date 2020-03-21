@@ -1,6 +1,6 @@
 # COVID Mutual Aid | Street Leaflet Coverage
 
-Current demo is at [http://covid-mutual.kode.site/](http://covid-mutual.kode.site/)
+Current demo is at [https://covid-mutual.kode.site/](https://covid-mutual.kode.site/)
 
 This is a project template for [Svelte](https://svelte.dev) apps. It lives at https://github.com/sveltejs/template.
 
